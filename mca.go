@@ -15,11 +15,11 @@ type mcaType struct {
     nr int
     nc int
     cost func (x int, y int) int
-    c [][]int
-    y [][]int
+    c []IntSl
+    y []IntSl
 }
 
-const MSI = math.MaxInt32
+const INF = math.MaxInt32
 
 func Min(x, y int) int {
     if x < y {
@@ -35,8 +35,38 @@ func Max(x, y int) int {
     return y
 }
 
-func extend(sl *[]int, ext int) {
-    *sl = append(*sl, ext)
+type IntSl struct {
+    sl []int
+}
+
+func (self IntSl) Init(v int) {
+    for i := range self.sl {
+        self.sl[i] = v
+    }
+}
+
+func (self IntSl) Max() (int, int) {
+    max := - INF
+    max_i := -1
+    for i := range self.sl {
+        if self.sl[i] > max {
+            max = self.sl[i]
+            max_i = i
+        }
+    }
+    return max, max_i
+}
+
+func (self IntSl) BinaryIndexOf(v int) int {
+    i := sort.SearchInts(self.sl, v)
+    if i < len(self.sl) && self.sl[i] == v {
+        return i
+    }
+    return -1
+}
+
+func (selfPtr *IntSl) extend(ext int) {
+    (*selfPtr).sl = append((*selfPtr).sl, ext)
 }
 
 // ----------------------------------------------------------------------------------------
@@ -53,30 +83,21 @@ func MakeMca(a string, b string, minMatch int) (mca mcaType) {
     mca.nr = len(mca.seq_a)
     mca.nc = len(mca.seq_b)
 
-    mca.c = make([][]int, mca.nr)
-    mca.y = make([][]int, mca.nr)
+    mca.c = make([]IntSl, mca.nr)
+    mca.y = make([]IntSl, mca.nr)
 
     mca.cost = func (x int, y int) int {
-        i_y := sort.SearchInts(mca.y[x], y)
-        if i_y < len(mca.y[x]) {
-            return mca.c[x][i_y]
-        } else {
-            return 0
+        i_y := mca.y[x].BinaryIndexOf(y)
+        if i_y != -1 {
+            return mca.c[x].sl[i_y]
         }
+        return 0
     }
 
     // create index for bigrams of characters in b
-    // var y_index [256][256][0]int
-    var y_index = make([][][]int, 256)
-    for i := range y_index {
-        y_index[i] = make([][]int, 256)
-        for j := range y_index[i] {
-            y_index[i][j] = make([]int, 0)
-        }
-    }
-
+    var y_index [256][256]IntSl
     for i := 0; i < len(mca.seq_b) -1; i++ {
-        extend(&y_index[mca.seq_b[i] % 256][mca.seq_b[i+1] % 256], i)
+        y_index[mca.seq_b[i] % 256][mca.seq_b[i+1] % 256].extend(i)
     }
 
     // Length of corresponding pieces in a and b is calculated. Efficient implementation by
@@ -89,9 +110,6 @@ func MakeMca(a string, b string, minMatch int) (mca mcaType) {
     var prev_y_indices []int     // copy of last y_indices
 
     for x := range mca.seq_a {
-        mca.c[x] = make([]int, 0)
-        mca.y[x] = make([]int, 0)
-
         for pos := range prev_y_indices {
             c_prev_x[ prev_y_indices[pos] ] = 0
         }
@@ -103,13 +121,13 @@ func MakeMca(a string, b string, minMatch int) (mca mcaType) {
         prev_y_indices = y_indices;
 
         if x < len(mca.seq_a)-1 {
-            y_indices = y_index[mca.seq_a[x] % 256][mca.seq_a[x+1] % 256]   // || character not in y_dic / b
+            y_indices = y_index[mca.seq_a[x] % 256][mca.seq_a[x+1] % 256].sl   // empty if character not in y_dic / b
         } else {
             y_indices = make([]int, 0)
         }
 
         for pos, prev_pos := 0, 0 ; pos < len(y_indices) || prev_pos < len(prev_y_indices) ; {
-            cur_y_ind, prev_y_ind := MSI, MSI
+            cur_y_ind, prev_y_ind := INF, INF
             if pos < len(y_indices) { cur_y_ind = y_indices[pos] }
             if prev_pos < len(prev_y_indices) { prev_y_ind = prev_y_indices[prev_pos] }
 
@@ -137,15 +155,14 @@ func MakeMca(a string, b string, minMatch int) (mca mcaType) {
             }
 
             if cxy >= minMatch {    // on suboptimal matchings remove constraint for tests
-                extend(&mca.c[x], cxy)
-                extend(&mca.y[x], y_merge)
+                mca.c[x].extend(cxy)
+                mca.y[x].extend(y_merge)
             }
             c_cur_x[y_merge] = cxy
         }
     }
     return mca
 }
-
 
 func main() {
     a := "ksajldkajsldkjalskd"
