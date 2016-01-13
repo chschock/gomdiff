@@ -20,12 +20,13 @@ func main() {
     a := "ksajldkajsldkjalskd"
     b := "ksajldkajkkkkksldkjooooalsppkd"
 
-    mca := MakeMca(a, b, 2)
+    mca := MakeMca(a, b, minMatch)
     fmt.Printf("%+v\n", mca)
     sol := SolveMca(mca)
     fmt.Printf("%+v\n", sol)
 }
 
+type Fp float32
 
 type McaType struct {
     seq_a []int32
@@ -491,7 +492,7 @@ func SolveMca(mca McaType) SolType {
         }
     }
 
-    fmt.Println("preprocessor matched %4.2f %%", 100.0 * match_cnt / mca.nr)
+    fmt.Printf("preprocessor matched %4.2f %%\n", 100.0 * Fp(match_cnt) / Fp(mca.nr))
 
     InitBool(S,false)
     InitBool(T,false)
@@ -618,11 +619,11 @@ func SolveMca(mca McaType) SolType {
         }
     }
 
-    fmt.Println("upper: %d, mid: %d, improve %d, lower: %d, marks: %d",
+    fmt.Printf("upper: %d, mid: %d, improve %d, lower: %d, marks: %d\n",
         stat_upper, stat_mid, stat_improve, stat_lower, stat_marks)
-    fmt.Println("early stopping at %4.2f %%, saved %d cycles, stopped with %d matches",
-        100.0 * match_cnt / mca.nr, mca.nr - match_cnt, match_cnt)
-    fmt.Println("total cost: %d, total match: %d, nr: %d, nc: %d,  minMatch: %d, swap %d",
+    fmt.Printf("early stopping at %4.2f %%, saved %d cycles, stopped with %d matches\n",
+        100.0 * Fp(match_cnt) / Fp(mca.nr), mca.nr - match_cnt, match_cnt)
+    fmt.Printf("total cost: %d, total match: %d, nr: %d, nc: %d,  minMatch: %d, swap: %t\n",
         sol.cost, total_match, mca.nr, mca.nc, minMatch, mca.swap)
 
     return sol
