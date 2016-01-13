@@ -8,7 +8,20 @@ import (
     "math"
 )
 
-type mcaType struct {
+const INF = math.MaxInt32
+
+func main() {
+    a := "ksajldkajsldkjalskd"
+    b := "ksajldkajkkkkksldkjooooalsppkd"
+
+    mca := MakeMca(a, b, 2)
+    fmt.Printf("%+v\n", mca)
+    sol := SolveMca(mca)
+    fmt.Printf("%+v\n", sol)
+}
+
+
+type McaType struct {
     seq_a []int32
     seq_b []int32
     swap bool
@@ -19,7 +32,10 @@ type mcaType struct {
     y []IntSl
 }
 
-const INF = math.MaxInt32
+func (mca McaType) String() string {
+    return fmt.Sprintf("%v\n%v\nnr: %d, nc: %d, swapped: %v\nc: %v\ny: %v\n",
+        mca.seq_a, mca.seq_b, mca.nr, mca.nc, mca.swap, mca.c, mca.y)
+}
 
 func Init(sl []int, v int) {
     for i := range sl {
@@ -47,9 +63,16 @@ func Max(x, y int) int {
     return y
 }
 
+// int slice with augmented functionality
+
+type CompareFunType func(i, j int) bool
+
 type IntSl struct {
     sl []int
+    less CompareFunType
 }
+
+func (self IntSl) String() string { return fmt.Sprintf("%v", self.sl) }
 
 func (self IntSl) Max() (int, int) {
     max := - INF
@@ -63,9 +86,9 @@ func (self IntSl) Max() (int, int) {
     return max, max_i
 }
 
-func (self IntSl) Len() int {
-    return len(self.sl)
-}
+func (self IntSl) Len() int { return len(self.sl) }
+func (p IntSl) Less(i, j int) bool { return p.less(i, j) }
+func (p IntSl) Swap(i, j int) { p.sl[i], p.sl[j] = p.sl[j], p.sl[i] }
 
 func (self IntSl) BinaryIndexOf(v int) int {
     i := sort.SearchInts(self.sl, v)
@@ -83,7 +106,7 @@ func (selfPtr *IntSl) extend(ext int) {
 // --------------------------- cost matrix computation
 // ----------------------------------------------------------------------------------------
 
-func MakeMca(a string, b string, minMatch int) (mca mcaType) {
+func MakeMca(a string, b string, minMatch int) (mca McaType) {
     mca.seq_a, mca.seq_b = []rune(a), []rune(b)
     mca.swap = len(mca.seq_a) > len(mca.seq_b)
     if(mca.swap) {
@@ -174,17 +197,20 @@ func MakeMca(a string, b string, minMatch int) (mca mcaType) {
     return mca
 }
 
+// sort int slice of indices according to other array
+
 var debug = false
 var sort_by_cost = false
+var skip_preproc = false
 var minMatch = 3
 
-type solType struct {
+type SolType struct {
     xy []int
     yx []int
     cost int
 }
 
-func SolveMca(mca mcaType) solType {
+func SolveMca(mca McaType) SolType {
     var lx, ly = make([]int, mca.nr), make([]int, mca.nc+mca.nr)
     var xy, yx = make([]int, mca.nr), make([]int, mca.nc+mca.nr)
     var S, T = make([]bool, mca.nr), make([]bool, mca.nc+mca.nr)
@@ -403,22 +429,66 @@ func SolveMca(mca mcaType) solType {
     }
 
     // setup lx, ly feasible
-    lx = make([]int, mca.nr)
     Init(ly, 0)
-    c_pp := make([]IntSl, mca.nr)
-
     for x := range mca.c {
-        c_pp[x].sl = make([]int, mca.c[x].Len())   // copy of cost for preprocessing
-        copy(c_pp[x].sl, mca.c[x].sl)
         lx[x], _ = mca.c[x].Max()
     }
 
+    for preprocessed := false; ; preprocessed = true {
+        // prepare sorting criteria and order slice
+        rowmax, rowmax_i := make([]int, mca.nr), make([]int, mca.nr)
+        for x := range mca.c {
+            if xy[x] != -1 {
+                rowmax[x], rowmax_i[x] = 0, -1  // is already greedy matched
+            } else {
+                rowmax[x], rowmax_i[x] = mca.c[x].Max()
+            }
+            row_order[x] = x
+        }
 
-    // for testing
-    for x := range mca.c {
-        row_order[x] = x
+        /* Algorithm performance strongly depends on the successive choice of x. We seperate
+         * sparse rows from the rest and sort them by decreasing cost, to prefer longer matches.
+         * The rest is sorted by decreasing sparsity, to match rows with many options at the end.
+         * Zeros are put at the very end. Cost refers to row maxima - the most probable match.
+        */
+
+        non_sparse := func(sl IntSl) bool { return sl.Len() > 5 }   // threshold to considered row dense
+
+        var tmp_order IntSl
+        tmp_order.sl = row_order
+        tmp_order.less = func(i, j int) bool {
+            switch {
+                case rowmax[i] == 0 && rowmax[j] == 0: return i < j // natural order (empty rows)
+                case rowmax[i] == 0: return false                   // non-matching last
+                case rowmax[j] == 0: return true                    // non-matching last
+                case non_sparse(mca.y[i]) && non_sparse(mca.y[j]):
+                    return mca.y[i].Len() < mca.y[j].Len()          // natural order (dense rows)
+                case non_sparse(mca.y[i]): return false             // sparse rows first
+                case non_sparse(mca.y[j]): return true              // sparse rows first
+                default: return rowmax[j] < rowmax[i]               // natural order (no rows)
+            }
+        }
+
+        sort.Sort(tmp_order)
+
+        // sort once again after greedy match
+        if preprocessed || skip_preproc {
+            break
+        }
+
+        // greedy match what is possible
+        for i_x := range row_order {
+            x := row_order[i_x]
+            if rowmax[x] == 0 {
+                continue
+            }
+            y := mca.y[x].sl[rowmax_i[x]]
+            if xy[x] == -1 && yx[y] == -1 {
+                xy[x], yx[y] = y, x
+                match_cnt ++
+            }
+        }
     }
-
 
     fmt.Println("preprocessor matched %4.2f %%", 100.0 * match_cnt / mca.nr)
 
@@ -427,15 +497,14 @@ func SolveMca(mca mcaType) solType {
     Init(rev_path, -1)
     Init(slack, INF)
 
-
     // main loop to grow the matching
     for ; match_cnt < mca.nr; match_cnt ++ {
         q_front, q_back = 0, 0
 
         // select unmatched x as path root
-        for x_o := range mca.c {
-            x := x_o
-            if sort_by_cost { x = row_order[x_o] }
+        for i_x := range mca.c {
+            x := i_x
+            if sort_by_cost { x = row_order[i_x] }
 
             if xy[x] == -1 {   // if x is unmatched
                 add_to_tree(x, false)
@@ -523,20 +592,20 @@ func SolveMca(mca mcaType) solType {
     //     // log matches
     //     for(var x=1; x<mca.nr; x++) {
     //         if (mca.cost(x, xy[x]) != mca.cost(x-1, xy[x]-1)) {
-    //             var c = mca.cost(x,xy[x]);
-    //             fmt.Println(''.concat('cost(', x, ',', xy[x], ') = ', c, '\n-> ', mca.a.slice(x, x+c), '\n-> ', mca.b.slice(xy[x], xy[x]+c)));
-    //             fmt.Println('+++++++++++++++++++++++++++++++++++++++++++');
+    //             var c = mca.cost(x,xy[x])
+    //             fmt.Println(''.concat('cost(', x, ',', xy[x], ') = ', c, '\n-> ', mca.a.slice(x, x+c), '\n-> ', mca.b.slice(xy[x], xy[x]+c)))
+    //             fmt.Println('+++++++++++++++++++++++++++++++++++++++++++')
     //         }
     //     }
 
     //     // log highest marked positions
-    //     var mark_pos_id = Array(mca.nr);
-    //     for (var i=0; i<mark_pos_id.length; i++) mark_pos_id[i] = i;
-    //     mark_pos_id.sort(function(x,y) {return mark_pos[y]-mark_pos[x];});
-    //     for (var i=0; i<10; i++) fmt.Println(mark_pos_id[i] + ': ' + mark_pos[mark_pos_id[i]]);
+    //     var mark_pos_id = Array(mca.nr)
+    //     for (var i=0; i<mark_pos_id.length; i++) mark_pos_id[i] = i
+    //     mark_pos_id.sort(function(x,y) {return mark_pos[y]-mark_pos[x];})
+    //     for (var i=0; i<10; i++) fmt.Println(mark_pos_id[i] + ': ' + mark_pos[mark_pos_id[i]])
     // }
 
-    var sol = solType{xy:xy, yx:yx, cost:0}
+    var sol = SolType{xy:xy, yx:yx, cost:0}
     total_match := 0
     for x := 0; x < mca.nr; x ++ {
         if xy[x] == -1 {
@@ -555,16 +624,7 @@ func SolveMca(mca mcaType) solType {
     fmt.Println("total cost: %d, total match: %d, nr: %d, nc: %d,  minMatch: %d, swap %d",
         sol.cost, total_match, mca.nr, mca.nc, minMatch, mca.swap)
 
-    return sol;
+    return sol
 
 }
 
-func main() {
-    a := "ksajldkajsldkjalskd"
-    b := "ksajldkajkkkkksldkjooooalsppkd"
-
-    mca := MakeMca(a, b, 2)
-    fmt.Printf("%+v\n", mca)
-    sol := SolveMca(mca)
-    fmt.Printf("%+v\n", sol)
-}
