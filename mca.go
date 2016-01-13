@@ -10,6 +10,12 @@ import (
 
 const INF = math.MaxInt32
 
+var debug = false
+var sort_by_cost = false
+var skip_preproc = false
+var early_stop = true
+var minMatch = 3
+
 func main() {
     a := "ksajldkajsldkjalskd"
     b := "ksajldkajkkkkksldkjooooalsppkd"
@@ -197,12 +203,7 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
     return mca
 }
 
-// sort int slice of indices according to other array
-
-var debug = false
-var sort_by_cost = false
-var skip_preproc = false
-var minMatch = 3
+// Calculate Mca solution
 
 type SolType struct {
     xy []int
@@ -546,21 +547,21 @@ func SolveMca(mca McaType) SolType {
         // the following early stopping criterion is correct if:
         // there has to be some free x, with some y*, with better cost(x, y*) than cost(yx[y], y)
 
-        // if (early_stop && match_cnt % 10 == 0) {
-        //     var only_crap_left = true
-        //     for (var x=0; x<mca.nr; x++) {
-        //         if (xy[x] != -1) continue
-        //         for (var i_y=0; i_y<mca.y[x].length - 1; i_y++) { // ignore the 0-cost node
-        //             var y = mca.y[x][i_y]
-        //             if (yx[y] == -1 || mca.c[x][i_y] > mca.cost(yx[y], y)) {
-        //                 only_crap_left = false
-        //                 break
-        //             }
-        //         }
-        //         if (!only_crap_left) break
-        //     }
-        //     if (only_crap_left) break
-        // }
+        if early_stop && match_cnt % 10 == 0 {
+            only_crap_left := true
+            for x := range mca.c {
+                if xy[x] != -1 { continue }
+                for i_y := range mca.y[x].sl {
+                    y := mca.y[x].sl[i_y]
+                    if yx[y] == -1 || mca.c[x].sl[i_y] > mca.cost(yx[y], y) {
+                        only_crap_left = false
+                        break
+                    }
+                }
+                if ! only_crap_left { break }
+            }
+            if only_crap_left { break }
+        }
 
         // correct, because matching is already flipped
         for i := 0; i < q_back; i ++ {
