@@ -2,10 +2,9 @@ package main
 
 import (
     "fmt"
-    //"os"
-    //"strings"
     "sort"
     "math"
+    "encoding/json"
 )
 
 const INF = math.MaxInt32
@@ -16,7 +15,7 @@ var skip_preproc = false
 var early_stop = true
 var minMatch = 3
 
-func main() {
+func old_main() {
     a := "ksajldkajsldkjalskd"
     b := "ksajldkajkkkkksldkjooooalsppkd"
 
@@ -29,19 +28,19 @@ func main() {
 type Fp float32
 
 type McaType struct {
-    seq_a []int32
-    seq_b []int32
-    swap bool
-    nr int
-    nc int
+    SeqA []int32    `json:"seq_a"`
+    SeqB []int32    `json:"seq_b"`
+    Swap bool       `json:"swap"`
+    NR int          `json:"nr"`
+    NC int          `json:"nc"`
     cost func (x int, y int) int
-    c []IntSl
-    y []IntSl
+    C []IntSl       `json:"c"`
+    Y []IntSl       `json:"y"`
 }
 
 func (mca McaType) String() string {
     return fmt.Sprintf("%v\n%v\nnr: %d, nc: %d, swapped: %v\nc: %v\ny: %v\n",
-        mca.seq_a, mca.seq_b, mca.nr, mca.nc, mca.swap, mca.c, mca.y)
+        mca.SeqA, mca.SeqB, mca.NR, mca.NC, mca.Swap, mca.C, mca.Y)
 }
 
 func Init(sl []int, v int) {
@@ -81,6 +80,14 @@ type IntSl struct {
 
 func (self IntSl) String() string { return fmt.Sprintf("%v", self.sl) }
 
+func (selfPtr *IntSl) MarshalJSON() ([]byte, error) {
+    cont, err := json.Marshal(selfPtr.sl)
+    if err != nil {
+        return nil, err
+    }
+    return cont, nil
+}
+
 func (self IntSl) Max() (int, int) {
     max := - INF
     max_i := -1
@@ -114,42 +121,42 @@ func (selfPtr *IntSl) extend(ext int) {
 // ----------------------------------------------------------------------------------------
 
 func MakeMca(a string, b string, minMatch int) (mca McaType) {
-    mca.seq_a, mca.seq_b = []rune(a), []rune(b)
-    mca.swap = len(mca.seq_a) > len(mca.seq_b)
-    if(mca.swap) {
-        mca.seq_a, mca.seq_b = mca.seq_b, mca.seq_a
+    mca.SeqA, mca.SeqB = []rune(a), []rune(b)
+    mca.Swap = len(mca.SeqA) > len(mca.SeqB)
+    if(mca.Swap) {
+        mca.SeqA, mca.SeqB = mca.SeqB, mca.SeqA
     }
 
-    mca.nr = len(mca.seq_a)
-    mca.nc = len(mca.seq_b)
+    mca.NR = len(mca.SeqA)
+    mca.NC = len(mca.SeqB)
 
-    mca.c = make([]IntSl, mca.nr)
-    mca.y = make([]IntSl, mca.nr)
+    mca.C = make([]IntSl, mca.NR)
+    mca.Y = make([]IntSl, mca.NR)
 
     mca.cost = func (x int, y int) int {
-        i_y := mca.y[x].BinaryIndexOf(y)
+        i_y := mca.Y[x].BinaryIndexOf(y)
         if i_y != -1 {
-            return mca.c[x].sl[i_y]
+            return mca.C[x].sl[i_y]
         }
         return 0
     }
 
     // create index for bigrams of characters in b
     var y_index [256][256]IntSl
-    for i := 0; i < len(mca.seq_b) -1; i ++ {
-        y_index[mca.seq_b[i] % 256][mca.seq_b[i+1] % 256].extend(i)
+    for i := 0; i < len(mca.SeqB) -1; i ++ {
+        y_index[mca.SeqB[i] % 256][mca.SeqB[i+1] % 256].extend(i)
     }
 
     // Length of corresponding pieces in a and b is calculated. Efficient implementation by
     // doing lookahead for starting correspondences and grabbing those values otherwise
 
-    c_cur_x := make([]int, mca.nc)  // materialized current row, 0 initialized
-    c_prev_x := make([]int, mca.nc) // copy of last row, 0 initialized
+    c_cur_x := make([]int, mca.NC)  // materialized current row, 0 initialized
+    c_prev_x := make([]int, mca.NC) // copy of last row, 0 initialized
 
     var y_indices []int          // positions matching current letter in a
     var prev_y_indices []int     // copy of last y_indices
 
-    for x := range mca.seq_a {
+    for x := range mca.SeqA {
         for pos := range prev_y_indices {
             c_prev_x[ prev_y_indices[pos] ] = 0
         }
@@ -160,8 +167,8 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
 
         prev_y_indices = y_indices
 
-        if x < len(mca.seq_a)-1 {
-            y_indices = y_index[mca.seq_a[x] % 256][mca.seq_a[x+1] % 256].sl   // empty if character not in y_dic / b
+        if x < len(mca.SeqA)-1 {
+            y_indices = y_index[mca.SeqA[x] % 256][mca.SeqA[x+1] % 256].sl   // empty if character not in y_dic / b
         } else {
             y_indices = make([]int, 0)
         }
@@ -175,28 +182,28 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
             var y_merge int  // CHECK: will this re-initialize ?
 
             if prev_y_ind < cur_y_ind {
-                // seq_a[x-1] == seq_b[prev_y_ind], seq_a[x] == seq_b[prev_y_ind+1]
+                // SeqA[x-1] == SeqB[prev_y_ind], SeqA[x] == SeqB[prev_y_ind+1]
                 y_merge = prev_y_ind + 1
                 prev_pos ++
                 if prev_y_ind == cur_y_ind - 1 {
                     pos ++
                 }
-                if y_merge < len(mca.seq_b) && mca.seq_a[x] == mca.seq_b[y_merge] {
+                if y_merge < len(mca.SeqB) && mca.SeqA[x] == mca.SeqB[y_merge] {
                     cxy = c_prev_x[prev_y_ind]
                 }
             } else {
                 // start new correspondence?
                 y_merge = cur_y_ind
                 pos ++
-                bound := Min(mca.nr - x, mca.nc - y_merge)
-                for cxy < bound && mca.seq_a[x+cxy] == mca.seq_b[y_merge+cxy] {
+                bound := Min(mca.NR - x, mca.NC - y_merge)
+                for cxy < bound && mca.SeqA[x+cxy] == mca.SeqB[y_merge+cxy] {
                     cxy ++
                 }
             }
 
             if cxy >= minMatch {    // on suboptimal matchings remove constraint for tests
-                mca.c[x].extend(cxy)
-                mca.y[x].extend(y_merge)
+                mca.C[x].extend(cxy)
+                mca.Y[x].extend(y_merge)
             }
             c_cur_x[y_merge] = cxy
         }
@@ -207,34 +214,34 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
 // Calculate Mca solution
 
 type SolType struct {
-    xy []int
-    yx []int
-    cost int
+    Cost int    `json:"cost"`
+    XY []int    `json:"xy"`
+    YX []int    `json:"yx"`
 }
 
 func SolveMca(mca McaType) SolType {
-    var lx, ly = make([]int, mca.nr), make([]int, mca.nc+mca.nr)
-    var xy, yx = make([]int, mca.nr), make([]int, mca.nc+mca.nr)
-    var S, T = make([]bool, mca.nr), make([]bool, mca.nc+mca.nr)
-    var slack = make([]int, mca.nc+mca.nr)
-    var slackx = make([]int, mca.nc+mca.nr)
-    var rev_path = make([]int, mca.nr)
+    var lx, ly = make([]int, mca.NR), make([]int, mca.NC+mca.NR)
+    var xy, yx = make([]int, mca.NR), make([]int, mca.NC+mca.NR)
+    var S, T = make([]bool, mca.NR), make([]bool, mca.NC+mca.NR)
+    var slack = make([]int, mca.NC+mca.NR)
+    var slackx = make([]int, mca.NC+mca.NR)
+    var rev_path = make([]int, mca.NR)
 
     // debug
-    var mark_pos = make([]int, mca.nr)  // 0 initialized
+    var mark_pos = make([]int, mca.NR)  // 0 initialized
     // stat
     var stat_upper, stat_mid, stat_lower, stat_marks, stat_improve int
     var match_cnt = 0
 
-    var row_order = make([]int, mca.nr)
-    var q = make([]int, mca.nr) // this is a queue, we maintain it manually with q_front, q_back
+    var row_order = make([]int, mca.NR)
+    var q = make([]int, mca.NR) // this is a queue, we maintain it manually with q_front, q_back
     var q_front, q_back int
     var slack0_pivot int
     var found_augmentation bool
     var x_aug, y_aug int
     var x int
 
-    var y_merge, prev_y_merge = make([]int, mca.nc+mca.nr), make([]int, mca.nc+mca.nr)
+    var y_merge, prev_y_merge = make([]int, mca.NC+mca.NR), make([]int, mca.NC+mca.NR)
     var y_merge_back, prev_y_merge_back = 0, 0
 
     merge_relevant_columns := func (x int) {
@@ -244,7 +251,7 @@ func SolveMca(mca McaType) SolType {
             y_merge_back = 0
 
             y_next := INF
-            if mca.y[x].Len() > 0 { y_next = Min(y_next, mca.y[x].sl[0]) }
+            if mca.Y[x].Len() > 0 { y_next = Min(y_next, mca.Y[x].sl[0]) }
             if prev_y_merge_back > 0 { y_next = Min(y_next, prev_y_merge[0]) }
 
             var i_y, prev_i_y = 0, 0
@@ -253,9 +260,9 @@ func SolveMca(mca McaType) SolType {
                 y_merge[y_merge_back] = y_cur
                 y_merge_back ++
 
-                for i_y < mca.y[x].Len() && mca.y[x].sl[i_y] <= y_cur { i_y ++ }
-                if  i_y < mca.y[x].Len() {
-                    y_next = Min(y_next, mca.y[x].sl[i_y])
+                for i_y < mca.Y[x].Len() && mca.Y[x].sl[i_y] <= y_cur { i_y ++ }
+                if  i_y < mca.Y[x].Len() {
+                    y_next = Min(y_next, mca.Y[x].sl[i_y])
                 }
 
                 for prev_i_y < prev_y_merge_back && prev_y_merge[prev_i_y] <= y_cur { prev_i_y ++ }
@@ -265,8 +272,8 @@ func SolveMca(mca McaType) SolType {
             }
         } else {
             y_merge_back = 0
-            for i_y := 0; i_y < mca.y[x].Len(); i_y ++ {
-                y_merge[y_merge_back] = mca.y[x].sl[i_y]
+            for i_y := 0; i_y < mca.Y[x].Len(); i_y ++ {
+                y_merge[y_merge_back] = mca.Y[x].sl[i_y]
                 y_merge_back ++
             }
         }
@@ -282,9 +289,9 @@ func SolveMca(mca McaType) SolType {
         S[x] = true
 
         // update slack and slackx
-        for i_y := 0; i_y < mca.y[x].Len(); i_y ++ {
-            y := mca.y[x].sl[i_y]
-            cxy := mca.c[x].sl[i_y]
+        for i_y := 0; i_y < mca.Y[x].Len(); i_y ++ {
+            y := mca.Y[x].sl[i_y]
+            cxy := mca.C[x].sl[i_y]
 
             if lx[x] + ly[y] - cxy < slack[y] {
                 slack[y] = lx[x] + ly[y] - cxy
@@ -329,9 +336,9 @@ func SolveMca(mca McaType) SolType {
             }
 
             // sparse heuristic: try only y with positive cost
-            for i_y := 0; i_y < mca.y[x].Len(); i_y ++ {
-                y := mca.y[x].sl[i_y]
-                if mca.c[x].sl[i_y] == lx[x] + ly[y] && !T[y] {
+            for i_y := 0; i_y < mca.Y[x].Len(); i_y ++ {
+                y := mca.Y[x].sl[i_y]
+                if mca.C[x].sl[i_y] == lx[x] + ly[y] && !T[y] {
                     if yx[y] == -1 { // if y is unmatched
                         augment(x, y)
                         stat_mid ++ // stat
@@ -352,11 +359,11 @@ func SolveMca(mca McaType) SolType {
 
         delta := INF
 
-        // for (var y=0; y<mca.nc+mca.nr; y++)
+        // for (var y=0; y<mca.NC+mca.NR; y++)
         //     if (slack[y] < INF && y_merge.indexOf(y) == -1) // && mca.cost(slackx[y], y) > 0)
         //         fmt.Println(y_merge + ' y ' + y + ' slack[y] ' + slack[y] + ' cost ' + mca.cost(slackx[y], y))
 
-        // for (var y = 0; y < mca.nc+mca.nr; y++) {
+        // for (var y = 0; y < mca.NC+mca.NR; y++) {
         for i_y := 0; i_y < y_merge_back; i_y ++ {
             y := y_merge[i_y]
             if !T[y] && slack[y] < delta {
@@ -375,7 +382,7 @@ func SolveMca(mca McaType) SolType {
         }
 
         slack0_pivot = -1
-        // for (var y = 0; y < mca.nc+mca.nr; y++) {
+        // for (var y = 0; y < mca.NC+mca.NR; y++) {
         for i_y := 0; i_y < y_merge_back; i_y ++ {
             y := y_merge[i_y]
             if !T[y] && slack[y] < INF {
@@ -399,7 +406,7 @@ func SolveMca(mca McaType) SolType {
     grow_eq_subgraph := func() {
         if debug { fmt.Println("grow equality subgraph") }
         // search all y: this ensures path augmentation
-        // for (var y = slack0_pivot; y < mca.nc; ++y)
+        // for (var y = slack0_pivot; y < mca.NC; ++y)
         for slack0_pivot != -1 {
             y := slack0_pivot
             slack0_pivot = -1
@@ -425,25 +432,25 @@ func SolveMca(mca McaType) SolType {
     Init(yx, -1)
 
     // prepare sparse problem
-    for x := 0; x < mca.nr; x ++ {
-        mca.y[x].extend(mca.nc + x)
-        mca.c[x].extend(0)
+    for x := 0; x < mca.NR; x ++ {
+        mca.Y[x].extend(mca.NC + x)
+        mca.C[x].extend(0)
     }
 
     // setup lx, ly feasible
     Init(ly, 0)
-    for x := range mca.c {
-        lx[x], _ = mca.c[x].Max()
+    for x := range mca.C {
+        lx[x], _ = mca.C[x].Max()
     }
 
     for preprocessed := false; ; preprocessed = true {
         // prepare sorting criteria and order slice
-        rowmax, rowmax_i := make([]int, mca.nr), make([]int, mca.nr)
-        for x := range mca.c {
+        rowmax, rowmax_i := make([]int, mca.NR), make([]int, mca.NR)
+        for x := range mca.C {
             if xy[x] != -1 {
                 rowmax[x], rowmax_i[x] = 0, -1  // is already greedy matched
             } else {
-                rowmax[x], rowmax_i[x] = mca.c[x].Max()
+                rowmax[x], rowmax_i[x] = mca.C[x].Max()
             }
             row_order[x] = x
         }
@@ -463,10 +470,10 @@ func SolveMca(mca McaType) SolType {
                 case rowmax[i] == 0 && rowmax[j] == 0: return i < j // natural order (empty rows)
                 case rowmax[i] == 0: return false                   // non-matching last
                 case rowmax[j] == 0: return true                    // non-matching last
-                case non_sparse(mca.y[i]) && non_sparse(mca.y[j]):
-                    return mca.y[i].Len() < mca.y[j].Len()          // natural order (dense rows)
-                case non_sparse(mca.y[i]): return false             // sparse rows first
-                case non_sparse(mca.y[j]): return true              // sparse rows first
+                case non_sparse(mca.Y[i]) && non_sparse(mca.Y[j]):
+                    return mca.Y[i].Len() < mca.Y[j].Len()          // natural order (dense rows)
+                case non_sparse(mca.Y[i]): return false             // sparse rows first
+                case non_sparse(mca.Y[j]): return true              // sparse rows first
                 default: return rowmax[j] < rowmax[i]               // natural order (no rows)
             }
         }
@@ -484,7 +491,7 @@ func SolveMca(mca McaType) SolType {
             if rowmax[x] == 0 {
                 continue
             }
-            y := mca.y[x].sl[rowmax_i[x]]
+            y := mca.Y[x].sl[rowmax_i[x]]
             if xy[x] == -1 && yx[y] == -1 {
                 xy[x], yx[y] = y, x
                 match_cnt ++
@@ -492,7 +499,7 @@ func SolveMca(mca McaType) SolType {
         }
     }
 
-    fmt.Printf("preprocessor matched %4.2f %%\n", 100.0 * Fp(match_cnt) / Fp(mca.nr))
+    fmt.Printf("preprocessor matched %4.2f %%\n", 100.0 * Fp(match_cnt) / Fp(mca.NR))
 
     InitBool(S,false)
     InitBool(T,false)
@@ -500,11 +507,11 @@ func SolveMca(mca McaType) SolType {
     Init(slack, INF)
 
     // main loop to grow the matching
-    for ; match_cnt < mca.nr; match_cnt ++ {
+    for ; match_cnt < mca.NR; match_cnt ++ {
         q_front, q_back = 0, 0
 
         // select unmatched x as path root
-        for i_x := range mca.c {
+        for i_x := range mca.C {
             x := i_x
             if sort_by_cost { x = row_order[i_x] }
 
@@ -550,11 +557,11 @@ func SolveMca(mca McaType) SolType {
 
         if early_stop && match_cnt % 10 == 0 {
             only_crap_left := true
-            for x := range mca.c {
+            for x := range mca.C {
                 if xy[x] != -1 { continue }
-                for i_y := range mca.y[x].sl {
-                    y := mca.y[x].sl[i_y]
-                    if yx[y] == -1 || mca.c[x].sl[i_y] > mca.cost(yx[y], y) {
+                for i_y := range mca.Y[x].sl {
+                    y := mca.Y[x].sl[i_y]
+                    if yx[y] == -1 || mca.C[x].sl[i_y] > mca.cost(yx[y], y) {
                         only_crap_left = false
                         break
                     }
@@ -579,10 +586,10 @@ func SolveMca(mca McaType) SolType {
         // correctness check, on suboptimal matchings uncomment to check if sparse resets work
         if debug {
             if (match_cnt % 10 == 0) {
-                for x := 0; x < mca.nr; x ++ {
+                for x := 0; x < mca.NR; x ++ {
                     if S[x] != false || rev_path[x] != -1 || xy[x] != -1 && x != yx[xy[x]] { fmt.Println("f*** x") }
                 }
-                for y := 0; y < mca.nc; y ++ {
+                for y := 0; y < mca.NC; y ++ {
                     if T[y] != false || yx[y] != -1 && y != xy[yx[y]] { fmt.Println("f*** y") }
                 }
             }
@@ -592,7 +599,7 @@ func SolveMca(mca McaType) SolType {
 
     // if debug {
     //     // log matches
-    //     for(var x=1; x<mca.nr; x++) {
+    //     for(var x=1; x<mca.NR; x++) {
     //         if (mca.cost(x, xy[x]) != mca.cost(x-1, xy[x]-1)) {
     //             var c = mca.cost(x,xy[x])
     //             fmt.Println(''.concat('cost(', x, ',', xy[x], ') = ', c, '\n-> ', mca.a.slice(x, x+c), '\n-> ', mca.b.slice(xy[x], xy[x]+c)))
@@ -601,20 +608,20 @@ func SolveMca(mca McaType) SolType {
     //     }
 
     //     // log highest marked positions
-    //     var mark_pos_id = Array(mca.nr)
+    //     var mark_pos_id = Array(mca.NR)
     //     for (var i=0; i<mark_pos_id.length; i++) mark_pos_id[i] = i
     //     mark_pos_id.sort(function(x,y) {return mark_pos[y]-mark_pos[x];})
     //     for (var i=0; i<10; i++) fmt.Println(mark_pos_id[i] + ': ' + mark_pos[mark_pos_id[i]])
     // }
 
-    var sol = SolType{xy:xy, yx:yx, cost:0}
+    var sol = SolType{Cost:0, XY:xy, YX:yx}
     total_match := 0
-    for x := 0; x < mca.nr; x ++ {
+    for x := 0; x < mca.NR; x ++ {
         if xy[x] == -1 {
             continue
         }
         if c := mca.cost(x, xy[x]); c > 0 {
-            sol.cost += c
+            sol.Cost += c
             total_match ++
         }
     }
@@ -622,9 +629,9 @@ func SolveMca(mca McaType) SolType {
     fmt.Printf("upper: %d, mid: %d, improve %d, lower: %d, marks: %d\n",
         stat_upper, stat_mid, stat_improve, stat_lower, stat_marks)
     fmt.Printf("early stopping at %4.2f %%, saved %d cycles, stopped with %d matches\n",
-        100.0 * Fp(match_cnt) / Fp(mca.nr), mca.nr - match_cnt, match_cnt)
+        100.0 * Fp(match_cnt) / Fp(mca.NR), mca.NR - match_cnt, match_cnt)
     fmt.Printf("total cost: %d, total match: %d, nr: %d, nc: %d,  minMatch: %d, swap: %t\n",
-        sol.cost, total_match, mca.nr, mca.nc, minMatch, mca.swap)
+        sol.Cost, total_match, mca.NR, mca.NC, minMatch, mca.Swap)
 
     return sol
 
