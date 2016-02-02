@@ -4,7 +4,6 @@ import (
     "fmt"
     "sort"
     "math"
-    "encoding/json"
 )
 
 const INF = math.MaxInt32
@@ -71,50 +70,44 @@ func Max(x, y int) int {
 
 // int slice with augmented functionality
 
-type CompareFunType func(i, j int) bool
-
-type IntSl struct {
-    sl []int
-    less CompareFunType
-}
-
-func (self IntSl) String() string { return fmt.Sprintf("%v", self.sl) }
-
-func (selfPtr *IntSl) MarshalJSON() ([]byte, error) {
-    cont, err := json.Marshal(selfPtr.sl)
-    if err != nil {
-        return nil, err
-    }
-    return cont, nil
-}
+type IntSl []int
 
 func (self IntSl) Max() (int, int) {
     max := - INF
     max_i := -1
-    for i := range self.sl {
-        if self.sl[i] > max {
-            max = self.sl[i]
+    for i := range self {
+        if self[i] > max {
+            max = self[i]
             max_i = i
         }
     }
     return max, max_i
 }
 
-func (self IntSl) Len() int { return len(self.sl) }
-func (p IntSl) Less(i, j int) bool { return p.less(i, j) }
-func (p IntSl) Swap(i, j int) { p.sl[i], p.sl[j] = p.sl[j], p.sl[i] }
-
 func (self IntSl) BinaryIndexOf(v int) int {
-    i := sort.SearchInts(self.sl, v)
-    if i < len(self.sl) && self.sl[i] == v {
+    i := sort.SearchInts(self, v)
+    if i < len(self) && self[i] == v {
         return i
     }
     return -1
 }
 
 func (selfPtr *IntSl) extend(ext int) {
-    (*selfPtr).sl = append((*selfPtr).sl, ext)
+    *selfPtr = append(*selfPtr, ext)
 }
+
+// aggregate int slice with custom order function
+
+type CompareFunType func(i, j int) bool
+
+type PriorityIntSl struct {
+    IntSl
+    less CompareFunType
+}
+
+func (self PriorityIntSl) Len() int { return len(self.IntSl) }
+func (p PriorityIntSl) Less(i, j int) bool { return p.less(i, j) }
+func (p PriorityIntSl) Swap(i, j int) { p.IntSl[i], p.IntSl[j] = p.IntSl[j], p.IntSl[i] }
 
 // ----------------------------------------------------------------------------------------
 // --------------------------- cost matrix computation
@@ -136,7 +129,7 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
     mca.cost = func (x int, y int) int {
         i_y := mca.Y[x].BinaryIndexOf(y)
         if i_y != -1 {
-            return mca.C[x].sl[i_y]
+            return mca.C[x][i_y]
         }
         return 0
     }
@@ -168,7 +161,7 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
         prev_y_indices = y_indices
 
         if x < len(mca.SeqA)-1 {
-            y_indices = y_index[mca.SeqA[x] % 256][mca.SeqA[x+1] % 256].sl   // empty if character not in y_dic / b
+            y_indices = y_index[mca.SeqA[x] % 256][mca.SeqA[x+1] % 256]   // empty if character not in y_dic / b
         } else {
             y_indices = make([]int, 0)
         }
@@ -251,7 +244,7 @@ func SolveMca(mca McaType) SolType {
             y_merge_back = 0
 
             y_next := INF
-            if mca.Y[x].Len() > 0 { y_next = Min(y_next, mca.Y[x].sl[0]) }
+            if len(mca.Y[x]) > 0 { y_next = Min(y_next, mca.Y[x][0]) }
             if prev_y_merge_back > 0 { y_next = Min(y_next, prev_y_merge[0]) }
 
             var i_y, prev_i_y = 0, 0
@@ -260,9 +253,9 @@ func SolveMca(mca McaType) SolType {
                 y_merge[y_merge_back] = y_cur
                 y_merge_back ++
 
-                for i_y < mca.Y[x].Len() && mca.Y[x].sl[i_y] <= y_cur { i_y ++ }
-                if  i_y < mca.Y[x].Len() {
-                    y_next = Min(y_next, mca.Y[x].sl[i_y])
+                for i_y < len(mca.Y[x]) && mca.Y[x][i_y] <= y_cur { i_y ++ }
+                if  i_y < len(mca.Y[x]) {
+                    y_next = Min(y_next, mca.Y[x][i_y])
                 }
 
                 for prev_i_y < prev_y_merge_back && prev_y_merge[prev_i_y] <= y_cur { prev_i_y ++ }
@@ -272,8 +265,8 @@ func SolveMca(mca McaType) SolType {
             }
         } else {
             y_merge_back = 0
-            for i_y := 0; i_y < mca.Y[x].Len(); i_y ++ {
-                y_merge[y_merge_back] = mca.Y[x].sl[i_y]
+            for i_y := 0; i_y < len(mca.Y[x]); i_y ++ {
+                y_merge[y_merge_back] = mca.Y[x][i_y]
                 y_merge_back ++
             }
         }
@@ -289,9 +282,9 @@ func SolveMca(mca McaType) SolType {
         S[x] = true
 
         // update slack and slackx
-        for i_y := 0; i_y < mca.Y[x].Len(); i_y ++ {
-            y := mca.Y[x].sl[i_y]
-            cxy := mca.C[x].sl[i_y]
+        for i_y := 0; i_y < len(mca.Y[x]); i_y ++ {
+            y := mca.Y[x][i_y]
+            cxy := mca.C[x][i_y]
 
             if lx[x] + ly[y] - cxy < slack[y] {
                 slack[y] = lx[x] + ly[y] - cxy
@@ -336,9 +329,9 @@ func SolveMca(mca McaType) SolType {
             }
 
             // sparse heuristic: try only y with positive cost
-            for i_y := 0; i_y < mca.Y[x].Len(); i_y ++ {
-                y := mca.Y[x].sl[i_y]
-                if mca.C[x].sl[i_y] == lx[x] + ly[y] && !T[y] {
+            for i_y := 0; i_y < len(mca.Y[x]); i_y ++ {
+                y := mca.Y[x][i_y]
+                if mca.C[x][i_y] == lx[x] + ly[y] && !T[y] {
                     if yx[y] == -1 { // if y is unmatched
                         augment(x, y)
                         stat_mid ++ // stat
@@ -461,17 +454,17 @@ func SolveMca(mca McaType) SolType {
          * Zeros are put at the very end. Cost refers to row maxima - the most probable match.
         */
 
-        non_sparse := func(sl IntSl) bool { return sl.Len() > 5 }   // threshold to considered row dense
+        non_sparse := func(sl IntSl) bool { return len(sl) > 5 }   // threshold to considered row dense
 
-        var tmp_order IntSl
-        tmp_order.sl = row_order
+        var tmp_order PriorityIntSl
+        tmp_order.IntSl = row_order
         tmp_order.less = func(i, j int) bool {
             switch {
                 case rowmax[i] == 0 && rowmax[j] == 0: return i < j // natural order (empty rows)
                 case rowmax[i] == 0: return false                   // non-matching last
                 case rowmax[j] == 0: return true                    // non-matching last
                 case non_sparse(mca.Y[i]) && non_sparse(mca.Y[j]):
-                    return mca.Y[i].Len() < mca.Y[j].Len()          // natural order (dense rows)
+                    return len(mca.Y[i]) < len(mca.Y[j])            // natural order (dense rows)
                 case non_sparse(mca.Y[i]): return false             // sparse rows first
                 case non_sparse(mca.Y[j]): return true              // sparse rows first
                 default: return rowmax[j] < rowmax[i]               // natural order (no rows)
@@ -491,7 +484,7 @@ func SolveMca(mca McaType) SolType {
             if rowmax[x] == 0 {
                 continue
             }
-            y := mca.Y[x].sl[rowmax_i[x]]
+            y := mca.Y[x][rowmax_i[x]]
             if xy[x] == -1 && yx[y] == -1 {
                 xy[x], yx[y] = y, x
                 match_cnt ++
@@ -559,9 +552,9 @@ func SolveMca(mca McaType) SolType {
             only_crap_left := true
             for x := range mca.C {
                 if xy[x] != -1 { continue }
-                for i_y := range mca.Y[x].sl {
-                    y := mca.Y[x].sl[i_y]
-                    if yx[y] == -1 || mca.C[x].sl[i_y] > mca.cost(yx[y], y) {
+                for i_y := range mca.Y[x] {
+                    y := mca.Y[x][i_y]
+                    if yx[y] == -1 || mca.C[x][i_y] > mca.cost(yx[y], y) {
                         only_crap_left = false
                         break
                     }
