@@ -9,20 +9,9 @@ import (
 const INF = math.MaxInt32
 
 var debug = false
-var sort_by_cost = false
+var sort_by_cost = true
 var skip_preproc = false
 var early_stop = true
-var minMatch = 3
-
-func old_main() {
-    a := "ksajldkajsldkjalskd"
-    b := "ksajldkajkkkkksldkjooooalsppkd"
-
-    mca := MakeMca(a, b, minMatch)
-    fmt.Printf("%+v\n", mca)
-    sol := SolveMca(mca)
-    fmt.Printf("%+v\n", sol)
-}
 
 type Fp float32
 
@@ -32,9 +21,16 @@ type McaType struct {
     Swap bool       `json:"swap"`
     NR int          `json:"nr"`
     NC int          `json:"nc"`
-    cost func (x int, y int) int
     C []IntSl       `json:"c"`
     Y []IntSl       `json:"y"`
+    cost func (x int, y int) int
+    minMatch int
+}
+
+type SolType struct {
+    Cost int    `json:"cost"`
+    XY []int    `json:"xy"`
+    YX []int    `json:"yx"`
 }
 
 func (mca McaType) String() string {
@@ -133,6 +129,7 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
         }
         return 0
     }
+    mca.minMatch = minMatch
 
     // create index for bigrams of characters in b
     var y_index [256][256]IntSl
@@ -205,12 +202,6 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
 }
 
 // Calculate Mca solution
-
-type SolType struct {
-    Cost int    `json:"cost"`
-    XY []int    `json:"xy"`
-    YX []int    `json:"yx"`
-}
 
 func SolveMca(mca McaType) SolType {
     var lx, ly = make([]int, mca.NR), make([]int, mca.NC+mca.NR)
@@ -624,7 +615,7 @@ func SolveMca(mca McaType) SolType {
     fmt.Printf("early stopping at %4.2f %%, saved %d cycles, stopped with %d matches\n",
         100.0 * Fp(match_cnt) / Fp(mca.NR), mca.NR - match_cnt, match_cnt)
     fmt.Printf("total cost: %d, total match: %d, nr: %d, nc: %d,  minMatch: %d, swap: %t\n",
-        sol.Cost, total_match, mca.NR, mca.NC, minMatch, mca.Swap)
+        sol.Cost, total_match, mca.NR, mca.NC, mca.minMatch, mca.Swap)
 
     return sol
 

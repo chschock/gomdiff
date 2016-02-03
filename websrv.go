@@ -26,7 +26,7 @@ func solve(w http.ResponseWriter, r * http.Request){
     	b := r.URL.Query().Get("b")
     	minMatch, _ := strconv.Atoi(r.URL.Query().Get("minMatch"))
 
-	    fmt.Printf("a: %+v\nb: %+v\n minMatch: %+v\n", a, b, minMatch)
+	    // fmt.Printf("a: %+v\nb: %+v\n minMatch: %+v\n", a, b, minMatch)
 
         mca := MakeMca(a, b, minMatch)
 	    // fmt.Fprintf(w, "%+v\n", mca)
