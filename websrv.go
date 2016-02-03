@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"github.com/gorilla/mux"
+    "github.com/davecheney/profile"
 )
 
 type Output struct {
@@ -36,6 +37,8 @@ func solve(w http.ResponseWriter, r * http.Request){
 }
 
 func main() {
+    defer profile.Start(profile.CPUProfile).Stop()
+
     router := mux.NewRouter().StrictSlash(true)
     router.HandleFunc("/", about)
     router.HandleFunc("/solve", solve)
