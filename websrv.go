@@ -41,7 +41,7 @@ func solve(w http.ResponseWriter, r * http.Request){
         json.NewEncoder(w).Encode(Output{Mca: mca, Sol: sol})
 }
 
-const gen_profile_data = false
+const gen_profile_data = true
 
 func main() {
     if gen_profile_data {

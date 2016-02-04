@@ -16,8 +16,8 @@ var early_stop = true
 type Fp float32
 
 type McaType struct {
-    SeqA []int32    `json:"seq_a"`
-    SeqB []int32    `json:"seq_b"`
+    seqA []int32    `json:"seq_a"`
+    seqB []int32    `json:"seq_b"`
     Swap bool       `json:"swap"`
     NR int          `json:"nr"`
     NC int          `json:"nc"`
@@ -35,7 +35,7 @@ type SolType struct {
 
 func (mca McaType) String() string {
     return fmt.Sprintf("%v\n%v\nnr: %d, nc: %d, swapped: %v\nc: %v\ny: %v\n",
-        mca.SeqA, mca.SeqB, mca.NR, mca.NC, mca.Swap, mca.C, mca.Y)
+        mca.seqA, mca.seqB, mca.NR, mca.NC, mca.Swap, mca.C, mca.Y)
 }
 
 func Init(sl []int, v int) {
@@ -110,14 +110,14 @@ func (p PriorityIntSl) Swap(i, j int) { p.IntSl[i], p.IntSl[j] = p.IntSl[j], p.I
 // ----------------------------------------------------------------------------------------
 
 func MakeMca(a string, b string, minMatch int) (mca McaType) {
-    mca.SeqA, mca.SeqB = []rune(a), []rune(b)
-    mca.Swap = len(mca.SeqA) > len(mca.SeqB)
+    mca.seqA, mca.seqB = []rune(a), []rune(b)
+    mca.Swap = len(mca.seqA) > len(mca.seqB)
     if(mca.Swap) {
-        mca.SeqA, mca.SeqB = mca.SeqB, mca.SeqA
+        mca.seqA, mca.seqB = mca.seqB, mca.seqA
     }
 
-    mca.NR = len(mca.SeqA)
-    mca.NC = len(mca.SeqB)
+    mca.NR = len(mca.seqA)
+    mca.NC = len(mca.seqB)
 
     mca.C = make([]IntSl, mca.NR)
     mca.Y = make([]IntSl, mca.NR)
@@ -133,8 +133,8 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
 
     // create index for bigrams of characters in b
     var y_index [256][256]IntSl
-    for i := 0; i < len(mca.SeqB) -1; i ++ {
-        y_index[mca.SeqB[i] % 256][mca.SeqB[i+1] % 256].extend(i)
+    for i := 0; i < len(mca.seqB) -1; i ++ {
+        y_index[mca.seqB[i] % 256][mca.seqB[i+1] % 256].extend(i)
     }
 
     // Length of corresponding pieces in a and b is calculated. Efficient implementation by
@@ -146,7 +146,7 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
     var y_indices []int          // positions matching current letter in a
     var prev_y_indices []int     // copy of last y_indices
 
-    for x := range mca.SeqA {
+    for x := range mca.seqA {
         for pos := range prev_y_indices {
             c_prev_x[ prev_y_indices[pos] ] = 0
         }
@@ -157,8 +157,8 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
 
         prev_y_indices = y_indices
 
-        if x < len(mca.SeqA)-1 {
-            y_indices = y_index[mca.SeqA[x] % 256][mca.SeqA[x+1] % 256]   // empty if character not in y_dic / b
+        if x < len(mca.seqA)-1 {
+            y_indices = y_index[mca.seqA[x] % 256][mca.seqA[x+1] % 256]   // empty if character not in y_dic / b
         } else {
             y_indices = make([]int, 0)
         }
@@ -172,13 +172,13 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
             var y_merge int  // CHECK: will this re-initialize ?
 
             if prev_y_ind < cur_y_ind {
-                // SeqA[x-1] == SeqB[prev_y_ind], SeqA[x] == SeqB[prev_y_ind+1]
+                // seqA[x-1] == seqB[prev_y_ind], seqA[x] == seqB[prev_y_ind+1]
                 y_merge = prev_y_ind + 1
                 prev_pos ++
                 if prev_y_ind == cur_y_ind - 1 {
                     pos ++
                 }
-                if y_merge < len(mca.SeqB) && mca.SeqA[x] == mca.SeqB[y_merge] {
+                if y_merge < len(mca.seqB) && mca.seqA[x] == mca.seqB[y_merge] {
                     cxy = c_prev_x[prev_y_ind]
                 }
             } else {
@@ -186,7 +186,7 @@ func MakeMca(a string, b string, minMatch int) (mca McaType) {
                 y_merge = cur_y_ind
                 pos ++
                 bound := Min(mca.NR - x, mca.NC - y_merge)
-                for cxy < bound && mca.SeqA[x+cxy] == mca.SeqB[y_merge+cxy] {
+                for cxy < bound && mca.seqA[x+cxy] == mca.seqB[y_merge+cxy] {
                     cxy ++
                 }
             }
