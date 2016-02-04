@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 	"encoding/json"
+    "time"
 	"net/http"
 	"github.com/gorilla/mux"
     "github.com/davecheney/profile"
@@ -29,15 +30,23 @@ func solve(w http.ResponseWriter, r * http.Request){
 
 	    // fmt.Printf("a: %+v\nb: %+v\n minMatch: %+v\n", a, b, minMatch)
 
+        start := time.Now()
+
         mca := MakeMca(a, b, minMatch)
+        fmt.Println("MakeMca took %s sec", time.Since(start))
 	    // fmt.Fprintf(w, "%+v\n", mca)
     	sol := SolveMca(mca)
+        fmt.Println("MakeMca + SolveMca took %s sec", time.Since(start))
     	// fmt.Fprintf(w, "%+v\n", sol)
         json.NewEncoder(w).Encode(Output{Mca: mca, Sol: sol})
 }
 
+const gen_profile_data = false
+
 func main() {
-    defer profile.Start(profile.CPUProfile).Stop()
+    if gen_profile_data {
+        defer profile.Start(profile.CPUProfile).Stop()
+    }
 
     router := mux.NewRouter().StrictSlash(true)
     router.HandleFunc("/", about)
