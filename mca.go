@@ -16,8 +16,8 @@ var early_stop = true
 type Fp float32
 
 type McaType struct {
-    seqA []int32    `json:"seq_a"`
-    seqB []int32    `json:"seq_b"`
+    seqA []int32
+    seqB []int32
     Swap bool       `json:"swap"`
     NR int          `json:"nr"`
     NC int          `json:"nc"`
